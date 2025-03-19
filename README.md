@@ -37,6 +37,10 @@ Run the script to preprocess data, train the model, and save results:
 ```bash
 python train_model.py
 ```
+## Functions
+
+- **preprocess_churn_data**: Preprocesses churn and CPI data by encoding categorical variables, generating lag and rolling features, and merging external data sources.
+- **train_churn_model**: Trains a logistic regression model, applies SMOTE for class balancing, standardizes features, and saves the model, scaler, metrics, feature list, and SHAP values.
 
 ## Outputs:
 - **Model**: Logistic regression model (`model.pkl`).
@@ -94,11 +98,6 @@ Feature scaling was done using **StandardScaler**, which standardizes the featur
 ## SHAP for Model Explanation
 
 **SHAP** values were computed to explain the model's predictions. SHAP provides a way to understand the impact of each feature on individual predictions, making the model more interpretable and transparent. This is crucial for understanding how each feature contributes to the prediction of churn for each customer.
-
-## Functions
-
-- **preprocess_churn_data**: Preprocesses churn and CPI data by encoding categorical variables, generating lag and rolling features, and merging external data sources.
-- **train_churn_model**: Trains a logistic regression model, applies SMOTE for class balancing, standardizes features, and saves the model, scaler, metrics, feature list, and SHAP values.
 
 ## Future Work
 
