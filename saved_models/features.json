@@ -1,0 +1,1 @@
+["month", "months_since_issuing", "plan_type_encoded", "cpi", "transaction_amount_lag_1m", "transaction_amount_mean_prev_3m", "transaction_amount_slope_3m", "plan_type_encoded_lag_1m", "plan_type_encoded_mean_prev_3m", "plan_type_encoded_slope_3m", "cpi_lag_1m", "cpi_mean_prev_3m", "cpi_slope_3m"]
