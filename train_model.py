@@ -88,7 +88,7 @@ def train_churn_model(df, model_filepath, scaler_filepath, metrics_filepath, fea
     """
     Train a logistic regression model for churn prediction, explain the model using SHAP,
     and save the model, scaler, evaluation metrics, feature list, and SHAP values.
-    
+
     Parameters:
         df (pd.DataFrame): Processed DataFrame.
         model_filepath (str): Path to save the trained model.
@@ -99,11 +99,33 @@ def train_churn_model(df, model_filepath, scaler_filepath, metrics_filepath, fea
     """
     # Ensure data is sorted by customer & date
     df = df.sort_values(by=["customer_id", "date"])
-    
+
     # Keep only first churn event per customer
     df['first_churn_idx'] = df.groupby('customer_id')['churn'].transform(lambda x: x.idxmax() if x.max() == 1 else np.nan)
     df_filtered = df.loc[(df['churn'] == 0) | (df.index == df['first_churn_idx'])].drop(columns=['first_churn_idx'])
-    
+
+    # Define churn month per customer
+    df_filtered['churn_month'] = df_filtered.groupby("customer_id")["month"].transform(lambda x: x.max() if x.max() > 0 else np.nan)
+
+    # Define split cutoff (e.g., churns before month 9 go to training, others to test)
+    split_month = 9  # Adjust based on dataset distribution
+
+    # Create masks
+    churned_mask = df_filtered["churn"] == 1
+    non_churned_mask = df_filtered["churn"] == 0
+
+    # Split churners based on their churn timing
+    train_churned_mask = churned_mask & (df_filtered["churn_month"] < split_month)
+    test_churned_mask = churned_mask & (df_filtered["churn_month"] >= split_month)
+
+    # Decide what to do with non-churners (keep in train, or split?)
+    train_non_churned_mask = non_churned_mask & (df_filtered["month"] < split_month)  # Keep pre-cutoff non-churners
+    test_non_churned_mask = non_churned_mask & (df_filtered["month"] >= split_month)  # Optional: keep some in test
+
+    # Combine masks
+    train_mask = train_churned_mask | train_non_churned_mask
+    test_mask = test_churned_mask | test_non_churned_mask  # Remove `test_non_churned_mask` if only focusing on churners
+
     # Select features & target
     features = [
         "month", "months_since_issuing", "plan_type_encoded", "cpi",
@@ -112,65 +134,69 @@ def train_churn_model(df, model_filepath, scaler_filepath, metrics_filepath, fea
         "cpi_lag_1m", "cpi_mean_prev_3m", "cpi_slope_3m"
     ]
     target = "churn"
-    
-    X = df_filtered[features]
-    y = df_filtered[target]
-    
+
+    # Apply the split
+    X_train, y_train = df_filtered.loc[train_mask, features], df_filtered.loc[train_mask, target]
+    X_test, y_test = df_filtered.loc[test_mask, features], df_filtered.loc[test_mask, target]
+
+    print(min(X_train.month), max(X_train.month))
+    print(min(X_test.month), max(X_test.month))
+    print(X_train.shape, X_test.shape)
+
     # Handle NaNs
-    X.fillna(X.median(), inplace=True)
-    
-    # Split data (time-based)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-    
+    X_train.fillna(X_train.median(), inplace=True)
+    X_test.fillna(X_test.median(), inplace=True)
+
     # Apply SMOTE to balance classes
     smote = SMOTE(sampling_strategy=0.7, random_state=42)
     X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train)
-    
+
     # Standardize features
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train_resampled)
     X_test_scaled = scaler.transform(X_test)
-    
+
     # Train Logistic Regression Model
     log_reg = LogisticRegression(class_weight="balanced", random_state=42)
     log_reg.fit(X_train_scaled, y_train_resampled)
     y_pred = log_reg.predict(X_test_scaled)
-    
+
     # Compute metrics
     metrics = {
         "precision": precision_score(y_test, y_pred),
         "recall": recall_score(y_test, y_pred),
         "f1_score": f1_score(y_test, y_pred)
     }
-    
+
     # Save model
     with open(model_filepath, 'wb') as model_file:
         pickle.dump(log_reg, model_file)
-    
+
     # Save scaler
     with open(scaler_filepath, 'wb') as scaler_file:
         pickle.dump(scaler, scaler_file)
-    
+
     # Save metrics
     with open(metrics_filepath, 'w') as metrics_file:
         json.dump(metrics, metrics_file, indent=4)
-    
+
     # Save feature list
     with open(feature_list_filepath, 'w') as feature_file:
         json.dump(features, feature_file)
-    
+
     # Explain the Logistic Regression Model using SHAP
     explainer_log = shap.Explainer(log_reg, X_train_scaled)
     shap_values_log = explainer_log(X_test_scaled)
-    
+
     # Convert SHAP values to a DataFrame for better readability
     shap_df = pd.DataFrame(shap_values_log.values, columns=features)
     shap_df['shap_expected_value'] = shap_values_log.base_values  # Add expected value (mean prediction)
-    
+
     # Save SHAP values to CSV
     shap_df.to_csv(shap_filepath, index=False)
-    
+
     print(f"Model training completed. Model, scaler, metrics, features, and SHAP values saved. {shap_filepath}")
+
 
 if __name__ == "__main__":
     # Define folder path
