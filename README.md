@@ -69,6 +69,11 @@ python inference_model.py
 
 ## Explanations:
 
+### Removing Post-Churn Data in training
+1. A customer’s first churn event (churn=1) is identified.
+2. All interactions after the first churn event are removed to prevent data leakage.
+3. This ensures that the model only sees data up to the point of churn for each customer.
+
 ### Why Logistic Regression?
 Logistic regression was chosen as the model for this churn prediction task due to its simplicity, interpretability, and effectiveness when the target variable is binary (churn = 0 or 1). It also performs well when features are linearly separable, and it provides a probabilistic output, making it suitable for a business application like predicting customer churn.
 
